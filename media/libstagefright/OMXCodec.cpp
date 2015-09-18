@@ -1870,7 +1870,7 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
         cancelEnd = mPortBuffers[kPortIndexOutput].size();
     } else {
         // Return the last two buffers to the native window.
-        cancelStart = def.nBufferCountActual - minUndequeuedBufs;
+        cancelStart = def.nBufferCountActual;
         cancelEnd = def.nBufferCountActual;
     }
 
@@ -2795,6 +2795,9 @@ status_t OMXCodec::freeBuffersOnPort(
     }
 
     CHECK(onlyThoseWeOwn || buffers->isEmpty());
+    if (portIndex == kPortIndexOutput) {
+        mFilledBuffers.clear();
+    }
 
     return stickyErr;
 }
@@ -2931,9 +2934,16 @@ void OMXCodec::fillOutputBuffers() {
     }
 
     Vector<BufferInfo> *buffers = &mPortBuffers[kPortIndexOutput];
+    Vector<bool> buffersFilled;
+    for (size_t i = 0; i < buffers->size(); ++i) {
+        buffersFilled.push_back(false);
+    }
+    for (List<size_t>::iterator it = mFilledBuffers.begin(); it != mFilledBuffers.end(); ++it) {
+        buffersFilled.editItemAt(*it) = true;
+    }
     for (size_t i = 0; i < buffers->size(); ++i) {
         BufferInfo *info = &buffers->editItemAt(i);
-        if (info->mStatus == OWNED_BY_US) {
+        if (!buffersFilled[i] && info->mStatus == OWNED_BY_US) {
             fillOutputBuffer(&buffers->editItemAt(i));
         }
     }
@@ -4567,11 +4577,8 @@ void OMXCodec::initOutputFormat(const sp<MetaData> &inputFormat) {
 }
 
 status_t OMXCodec::pause() {
-    Mutex::Autolock autoLock(mLock);
-
-    mPaused = true;
-
-    return OK;
+    // b2g does not support aosp OMXCodec::pause(). See Bug 919590.
+    return ERROR_UNSUPPORTED;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
